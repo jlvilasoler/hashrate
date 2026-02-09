@@ -219,7 +219,7 @@
         <!-- Acciones Superior -->
         <div class="acciones-top">
             <div>
-                <a href="/" class="btn btn-volver btn-sm px-4 shadow-sm py-2 fw-bold text-white" title="Volver a la página principal">← VOLVER A INICIO</a>
+                
             </div>
             <div>
                 <button class="btn btn-excel btn-sm px-4 shadow-sm py-2" onclick="exportarHistorialExcel()">📊 EXCEL</button>
@@ -278,6 +278,17 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            
+            <!-- Botones inferiores -->
+            <div class="row mt-4 g-2">
+                <div class="col-12">
+                    <div class="text-end">
+                        <a href="/" class="btn btn-volver btn-sm px-4 shadow-sm py-2 fw-bold text-white" title="Volver a la página principal">← VOLVER</a>
+                        <button class="btn btn-excel btn-sm px-4 me-2 shadow-sm py-2" onclick="exportarHistorialExcel()">📊 EXCEL</button>
+                        <button class="btn btn-danger btn-sm px-4 shadow-sm py-2" onclick="abrirConfirmacionBorrar()">🗑️ LIMPIAR TODO</button>
+                    </div>
+                </div>
             </div>
         </div>
 
