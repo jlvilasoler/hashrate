@@ -1,76 +1,85 @@
 /* ============================================================
-   LÓGICA DE HISTORIAL DE FACTURAS - HRS
-   ============================================================ */
+   HISTORIAL DE FACTURAS - HRS
+============================================================ */
 
 let facturasOriginales = [];
+let chartMensual = null;
 
 window.onload = () => {
     cargarHistorial();
-    actualizarEstadisticas();
 };
 
-/* --- CARGAR Y MOSTRAR HISTORIAL --- */
+/* --- CARGAR HISTORIAL --- */
 function cargarHistorial() {
     facturasOriginales = JSON.parse(localStorage.getItem("facturas_hrs")) || [];
     mostrarFacturasEnTabla(facturasOriginales);
 }
 
+/* --- MOSTRAR TABLA --- */
 function mostrarFacturasEnTabla(facturas) {
+
     const tbody = document.getElementById("facturasHistorialBody");
-    
+
     if (facturas.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><small>No hay facturas registradas</small></td></tr>';
+        tbody.innerHTML = `
+        <tr>
+            <td colspan="7" class="text-center text-muted py-4">
+                <small>No hay facturas registradas</small>
+            </td>
+        </tr>`;
+        actualizarEstadisticas();
+        generarGraficoMensual();
         return;
     }
 
     tbody.innerHTML = facturas.map((factura, index) => {
+
         const tipo = factura.numero.startsWith("FC-") ? "Factura" : "Recibo";
-        const badgeClass = tipo === "Factura" ? "badge-factura" : "badge-recibo";
-        const fechaObj = new Date(factura.fecha);
-        const fechaFormato = fechaObj.toLocaleDateString('es-ES');
-        const mesFormato = factura.mes || fechaObj.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit' });
-        
+
         return `
-            <tr>
-                <td class="fw-bold">${factura.numero}</td>
-                <td><span class="${badgeClass}">${tipo}</span></td>
-                <td>${factura.cliente}</td>
-                <td>${fechaFormato}</td>
-                <td>${mesFormato}</td>
-                <td class="fw-bold">$ ${parseFloat(factura.total).toFixed(2)}</td>
-                <td class="text-center">
-                    <button class="btn btn-primary btn-action btn-sm" onclick="descargarFactura(${index})" title="Descargar PDF">
-                        📥
-                    </button>
-                    <button class="btn btn-warning btn-action btn-sm" onclick="verDetalles(${index})" title="Ver detalles">
-                        👁️
-                    </button>
-                    <button class="btn btn-danger btn-action btn-sm" onclick="eliminarFactura(${index})" title="Eliminar">
-                        🗑️
-                    </button>
-                </td>
-            </tr>
+        <tr>
+            <td class="fw-bold">${factura.numero}</td>
+            <td>${tipo}</td>
+            <td>${factura.cliente}</td>
+            <td>${factura.fecha}</td>
+            <td>${factura.mes || factura.fecha.substring(0,7)}</td>
+            <td class="fw-bold">$ ${parseFloat(factura.total).toFixed(2)}</td>
+            <td class="text-center">
+                <button class="btn btn-danger btn-sm" onclick="eliminarFactura(${index})">
+                    🗑️
+                </button>
+            </td>
+        </tr>
         `;
-    }).join('');
+    }).join("");
 
     actualizarEstadisticas();
+    generarGraficoMensual();
 }
 
 /* --- FILTROS --- */
 function aplicarFiltros() {
+
     const cliente = document.getElementById("filtroCliente").value.toLowerCase();
     const tipo = document.getElementById("filtroTipo").value;
     const mes = document.getElementById("filtroMes").value;
 
-    let facturasFiltradas = facturasOriginales.filter(factura => {
-        const cumpleCliente = factura.cliente.toLowerCase().includes(cliente);
-        const cumpleTipo = !tipo || (tipo === "Factura" && factura.numero.startsWith("FC-")) || (tipo === "Recibo" && factura.numero.startsWith("RC-"));
-        const cumpleMes = !mes || factura.mes?.startsWith(mes);
-        
+    let filtradas = facturasOriginales.filter(f => {
+
+        let cumpleCliente = f.cliente.toLowerCase().includes(cliente);
+
+        let cumpleTipo =
+            !tipo ||
+            (tipo === "Factura" && f.numero.startsWith("FC-")) ||
+            (tipo === "Recibo" && f.numero.startsWith("RC-"));
+
+        let mesFactura = f.mes || f.fecha.substring(0, 7);
+        let cumpleMes = !mes || mesFactura.startsWith(mes);
+
         return cumpleCliente && cumpleTipo && cumpleMes;
     });
 
-    mostrarFacturasEnTabla(facturasFiltradas);
+    mostrarFacturasEnTabla(filtradas);
 }
 
 function limpiarFiltros() {
@@ -80,167 +89,96 @@ function limpiarFiltros() {
     mostrarFacturasEnTabla(facturasOriginales);
 }
 
-/* --- ACCIONES SOBRE FACTURAS --- */
-function descargarFactura(index) {
-    const factura = facturasOriginales[index];
-    
-    try {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        const tipo = factura.numero.startsWith("FC-") ? "FACTURA" : "RECIBO";
-        const fecha = new Date(factura.fecha).toLocaleDateString('es-ES');
-        
-        // Encabezado
-        doc.setFontSize(20);
-        doc.text("HASHRATE SPACE", 105, 20, { align: "center" });
-        
-        doc.setFontSize(10);
-        doc.text(`Tipo: ${tipo} | Número: ${factura.numero}`, 20, 35);
-        doc.text(`Fecha: ${fecha}`, 20, 42);
-        doc.text(`Cliente: ${factura.cliente}`, 20, 49);
-        
-        // Servicios
-        let y = 65;
-        doc.setFont(undefined, 'bold');
-        doc.text("Descripción", 20, 60);
-        doc.text("Monto", 170, 60);
-        doc.setFont(undefined, 'normal');
-        
-        if (factura.servicios && factura.servicios.length > 0) {
-            factura.servicios.forEach(s => {
-                doc.text(s.concepto.substring(0, 50), 20, y);
-                doc.text(`$ ${parseFloat(s.monto).toFixed(2)}`, 170, y);
-                y += 8;
-            });
-        } else {
-            doc.text("(Sin detalles de servicios)", 20, y);
-            y += 8;
-        }
-        
-        // Total
-        doc.line(20, y, 190, y);
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text(`TOTAL FINAL: $ ${parseFloat(factura.total).toFixed(2)}`, 190, y + 12, { align: "right" });
-        
-        // Descargar
-        doc.save(`${factura.numero}_${factura.cliente.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-        mostrarAlerta("✅", "Descargado", `${factura.numero} descargado correctamente`);
-    } catch (error) {
-        console.error(error);
-        mostrarAlerta("❌", "Error", `No se pudo descargar ${factura.numero}`);
-    }
-}
-
-function verDetalles(index) {
-    const factura = facturasOriginales[index];
-    let servicios = "";
-    
-    if (factura.servicios && factura.servicios.length > 0) {
-        servicios = factura.servicios.map((s, i) => 
-            `${i + 1}. ${s.concepto}: $ ${s.monto.toFixed(2)}`
-        ).join("<br>");
-    } else {
-        servicios = "Sin servicios registrados";
-    }
-
-    const tipo = factura.numero.startsWith("FC-") ? "FACTURA" : "RECIBO";
-    let detalles = `
-        <strong>${tipo} #${factura.numero}</strong><br>
-        <strong>Cliente:</strong> ${factura.cliente}<br>
-        <strong>Fecha:</strong> ${factura.fecha}<br>
-        <strong>Mes:</strong> ${factura.mes || "N/A"}<br>
-        <hr>
-        <strong>Servicios:</strong><br>
-        ${servicios}<br>
-        <hr>
-        <strong>Total:</strong> $ ${parseFloat(factura.total).toFixed(2)}
-    `;
-
-    mostrarAlerta("👁️", "Detalles de " + tipo, detalles);
-}
-
+/* --- ELIMINAR --- */
 function eliminarFactura(index) {
-    const factura = facturasOriginales[index];
-    if (confirm(`¿Está seguro que desea eliminar ${factura.numero}?`)) {
-        facturasOriginales.splice(index, 1);
-        localStorage.setItem("facturas_hrs", JSON.stringify(facturasOriginales));
-        mostrarHistorial();
-        mostrarAlerta("✅", "Eliminado", `${factura.numero} ha sido eliminado del historial`);
-    }
+    facturasOriginales.splice(index, 1);
+    localStorage.setItem("facturas_hrs", JSON.stringify(facturasOriginales));
+    mostrarFacturasEnTabla(facturasOriginales);
 }
 
-/* --- EXPORTAR A EXCEL --- */
+/* --- EXPORTAR EXCEL --- */
 function exportarHistorialExcel() {
-    if (facturasOriginales.length === 0) {
-        mostrarAlerta("⚠️", "Sin datos", "No hay facturas para exportar");
-        return;
-    }
 
-    const datos = facturasOriginales.map(f => ({
-        "Número": f.numero,
-        "Tipo": f.numero.startsWith("FC-") ? "Factura" : "Recibo",
-        "Cliente": f.cliente,
-        "Fecha": f.fecha,
-        "Mes": f.mes || "",
-        "Total": parseFloat(f.total).toFixed(2)
-    }));
+    if (facturasOriginales.length === 0) return;
 
-    const ws = XLSX.utils.json_to_sheet(datos);
-    ws['!cols'] = [
-        { wch: 12 },
-        { wch: 10 },
-        { wch: 25 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 12 }
-    ];
-
+    const ws = XLSX.utils.json_to_sheet(facturasOriginales);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Historial");
-    
-    const nombreArchivo = `Historial_Facturas_${new Date().toLocaleDateString('es-ES')}.xlsx`;
-    XLSX.writeFile(wb, nombreArchivo);
 
-    mostrarAlerta("✅", "Exportado", `Archivo "${nombreArchivo}" descargado`);
+    XLSX.writeFile(wb, "Historial_Facturas.xlsx");
 }
 
 /* --- BORRAR TODO --- */
 function abrirConfirmacionBorrar() {
-    const modal = new bootstrap.Modal(document.getElementById("confirmarBorrarModal"));
-    modal.show();
+    new bootstrap.Modal(document.getElementById("confirmarBorrarModal")).show();
 }
 
 function confirmarBorrarHistorial() {
     facturasOriginales = [];
-    localStorage.setItem("facturas_hrs", JSON.stringify(facturasOriginales));
+    localStorage.setItem("facturas_hrs", JSON.stringify([]));
     bootstrap.Modal.getInstance(document.getElementById("confirmarBorrarModal")).hide();
-    mostrarHistorial();
-    mostrarAlerta("✅", "Historial limpiado", "Se ha eliminado todo el historial de facturas");
+    mostrarFacturasEnTabla([]);
 }
 
-/* --- ACTUALIZAR ESTADÍSTICAS --- */
+/* --- ESTADÍSTICAS --- */
 function actualizarEstadisticas() {
+
     const facturas = facturasOriginales.filter(f => f.numero.startsWith("FC-"));
     const recibos = facturasOriginales.filter(f => f.numero.startsWith("RC-"));
-    const montoTotal = facturasOriginales.reduce((sum, f) => sum + parseFloat(f.total || 0), 0);
+
+    const montoTotal = facturasOriginales.reduce(
+        (sum, f) => sum + parseFloat(f.total || 0),
+        0
+    );
 
     document.getElementById("statsFacturas").textContent = facturas.length;
     document.getElementById("statsRecibos").textContent = recibos.length;
-    document.getElementById("statsMontoTotal").textContent = `$ ${montoTotal.toFixed(2)}`;
+    document.getElementById("statsMontoTotal").textContent = "$ " + montoTotal.toFixed(2);
     document.getElementById("statsTotal").textContent = facturasOriginales.length;
 }
 
-function mostrarHistorial() {
-    cargarHistorial();
-}
+/* ============================================================
+   📊 GRÁFICO TOTAL POR MES
+============================================================ */
 
-/* --- MODAL DE ALERTA --- */
-function mostrarAlerta(icono, titulo, mensaje) {
-    document.getElementById("modalIcono").textContent = icono;
-    document.getElementById("modalTitulo").textContent = titulo;
-    document.getElementById("modalMensaje").innerHTML = mensaje;
-    
-    const modal = new bootstrap.Modal(document.getElementById("alertaModal"));
-    modal.show();
+function generarGraficoMensual() {
+
+    const totalesPorMes = {};
+
+    facturasOriginales.forEach(f => {
+
+        let mes = f.mes || f.fecha.substring(0, 7);
+
+        if (!totalesPorMes[mes]) {
+            totalesPorMes[mes] = 0;
+        }
+
+        totalesPorMes[mes] += parseFloat(f.total || 0);
+    });
+
+    const meses = Object.keys(totalesPorMes).sort();
+    const valores = meses.map(m => totalesPorMes[m]);
+
+    const canvas = document.getElementById("graficoFacturacionMes");
+    if (!canvas) return;
+
+    if (chartMensual) chartMensual.destroy();
+
+    chartMensual = new Chart(canvas, {
+        type: "bar",
+        data: {
+            labels: meses,
+            datasets: [{
+                label: "Total facturado ($)",
+                data: valores,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
 }
