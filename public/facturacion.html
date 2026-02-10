@@ -30,6 +30,9 @@
             pointer-events: none;
             z-index: 0;
         }
+
+        /* Tabla de Configuración más larga */
+        .col-lg-3 .card { min-height: 650px; overflow-y: auto; }
         
         /* Header */
  .faja-logo {
@@ -97,7 +100,6 @@
         .card:hover {
             background: rgba(255, 255, 255, 0.85);
             box-shadow: 0 16px 48px rgba(0, 204, 110, 0.15);
-            transform: translateY(-4px);
             border-color: rgba(0, 204, 110, 0.3);
         }
         
@@ -237,7 +239,6 @@
         
         .card-total:hover {
             box-shadow: 0 12px 36px rgba(0, 204, 110, 0.15);
-            transform: translateY(-2px);
         }
         
         .total-label { 
@@ -259,9 +260,14 @@
         }
         
         .bg-total-final {
-            background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%);
+            background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%) !important;
             border-radius: 16px;
             color: white;
+            box-shadow: 0 12px 36px rgba(0, 204, 110, 0.25);
+        }
+
+        .bg-total-final:hover {
+            background: linear-gradient(135deg, #00a652 0%, #00cc6e 100%) !important;
             box-shadow: 0 12px 36px rgba(0, 204, 110, 0.25);
         }
 
