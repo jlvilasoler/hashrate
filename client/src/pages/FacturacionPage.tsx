@@ -3,7 +3,7 @@ import { saveAs } from "file-saver";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { defaultClients, serviceCatalog } from "../lib/constants";
-import { generateFacturaPdf } from "../lib/generateFacturaPdf";
+import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
 import type { ComprobanteType, Invoice, LineItem } from "../lib/types";
 
@@ -116,7 +116,7 @@ export function FacturacionPage() {
     });
   }
 
-  function generatePdfAndSave() {
+  async function generatePdfAndSave() {
     if (!clientName || clientName.includes("INDICAR")) {
       alert("Debe seleccionar un cliente válido.");
       return;
@@ -135,16 +135,29 @@ export function FacturacionPage() {
     const dateStr = todayLocale();
     const month = items[0]!.month;
 
-    const doc = generateFacturaPdf({
-      number,
-      type,
-      clientName,
-      date: dateNow,
-      items,
-      subtotal,
-      discounts,
-      total,
-    });
+    // Cargar logo y faja HRS para el PDF a color (mismo diseño que la factura de referencia)
+    let logoBase64: string | undefined;
+    let fajaBase64: string | undefined;
+    try {
+      logoBase64 = await loadImageAsBase64("/images/LOGO-FACTURA-1.png");
+      fajaBase64 = await loadImageAsBase64("/images/FAJA-ABAJO-HRS.png");
+    } catch {
+      // Si falla la carga (ej. en tests), se genera sin imágenes
+    }
+
+    const doc = generateFacturaPdf(
+      {
+        number,
+        type,
+        clientName,
+        date: dateNow,
+        items,
+        subtotal,
+        discounts,
+        total,
+      },
+      { logoBase64, fajaBase64 }
+    );
 
     const safeName = clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
     doc.save(`${number}_${safeName}.pdf`);
