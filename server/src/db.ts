@@ -35,3 +35,13 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 `);
 
+// Añadir columnas opcionales a clients si no existen (para factura: teléfono, email, dirección, ciudad)
+["phone", "email", "address", "city"].forEach((col) => {
+  try {
+    db.exec(`ALTER TABLE clients ADD COLUMN ${col} TEXT`);
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes("duplicate column")) throw e;
+  }
+});
+

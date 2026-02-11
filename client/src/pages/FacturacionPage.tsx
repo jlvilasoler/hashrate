@@ -1,11 +1,12 @@
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { defaultClients, serviceCatalog } from "../lib/constants";
+import { getClients } from "../lib/api";
+import { serviceCatalog } from "../lib/constants";
 import { generateFacturaPdf, loadImageAsBase64 } from "../lib/generateFacturaPdf";
 import { loadInvoices, saveInvoices } from "../lib/storage";
-import type { ComprobanteType, Invoice, LineItem } from "../lib/types";
+import type { Client, ComprobanteType, Invoice, LineItem } from "../lib/types";
 import "../styles/facturacion.css";
 
 function todayLocale() {
@@ -41,8 +42,15 @@ function calcTotals(items: LineItem[]) {
 export function FacturacionPage() {
   const [type, setType] = useState<ComprobanteType>("Factura");
   const [clientQuery, setClientQuery] = useState("");
-  const [clientName, setClientName] = useState("INDICAR CLIENTE");
+  const [clients, setClients] = useState<Client[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState<number | "">("");
   const [items, setItems] = useState<LineItem[]>([]);
+
+  useEffect(() => {
+    getClients()
+      .then((r) => setClients((r.clients ?? []) as Client[]))
+      .catch(() => setClients([]));
+  }, []);
 
   const invoices = useMemo(() => loadInvoices(), []);
   const number = useMemo(() => nextNumber(type, invoices), [type, invoices]);
@@ -50,11 +58,16 @@ export function FacturacionPage() {
 
   const visibleClients = useMemo(() => {
     const q = clientQuery.trim().toLowerCase();
-    if (!q) return defaultClients;
-    return defaultClients.filter(
+    if (!q) return clients;
+    return clients.filter(
       (c) => `${c.code} - ${c.name}`.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
     );
-  }, [clientQuery]);
+  }, [clients, clientQuery]);
+
+  const selectedClient = useMemo(
+    () => (selectedClientId !== "" ? clients.find((c) => c.id === selectedClientId) ?? null : null),
+    [clients, selectedClientId]
+  );
 
   function addItem() {
     const def = serviceCatalog.A;
@@ -100,7 +113,7 @@ export function FacturacionPage() {
   }
 
   async function generatePdfAndSave() {
-    if (!clientName || clientName.includes("INDICAR")) {
+    if (!selectedClient) {
       alert("Debe seleccionar un cliente válido.");
       return;
     }
@@ -119,26 +132,37 @@ export function FacturacionPage() {
     const month = items[0]!.month;
 
     let logoBase64: string | undefined;
-    let fajaBase64: string | undefined;
     try {
-      logoBase64 = await loadImageAsBase64("/images/LOGO-FACTURA-1.png");
-      fajaBase64 = await loadImageAsBase64("/images/FAJA-ABAJO-HRS.png");
+      logoBase64 = await loadImageAsBase64("/images/LOGO-HASHRATE.png");
     } catch {
       //
     }
 
     const doc = generateFacturaPdf(
-      { number, type, clientName, date: dateNow, items, subtotal, discounts, total },
-      { logoBase64, fajaBase64 }
+      {
+        number,
+        type,
+        clientName: selectedClient.name,
+        clientPhone: selectedClient.phone,
+        clientEmail: selectedClient.email,
+        clientAddress: selectedClient.address,
+        clientCity: selectedClient.city,
+        date: dateNow,
+        items,
+        subtotal,
+        discounts,
+        total
+      },
+      { logoBase64 }
     );
-    const safeName = clientName.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
+    const safeName = selectedClient.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, " ").trim() || "cliente";
     doc.save(`${number}_${safeName}.pdf`);
 
     const inv: Invoice = {
       id: genId(),
       number,
       type,
-      clientName,
+      clientName: selectedClient.name,
       date: dateStr,
       month,
       subtotal,
@@ -195,20 +219,20 @@ export function FacturacionPage() {
                   <select
                     className="fact-select"
                     size={8}
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
+                    value={selectedClientId}
+                    onChange={(e) => setSelectedClientId(e.target.value === "" ? "" : Number(e.target.value))}
                     style={{ marginTop: "0.5rem" }}
                   >
-                    {visibleClients.map((c) => {
-                      const label = c.code === "INDICAR" ? c.name : `${c.code} - ${c.name}`;
-                      const value = c.code === "INDICAR" ? c.name : `${c.code} - ${c.name}`;
-                      return (
-                        <option key={c.code} value={value}>
-                          {label}
-                        </option>
-                      );
-                    })}
+                    <option value="">Seleccione cliente</option>
+                    {visibleClients.map((c) => (
+                      <option key={c.id ?? c.code} value={c.id ?? ""}>
+                        {c.code} - {c.name}
+                      </option>
+                    ))}
                   </select>
+                  {clients.length === 0 && (
+                    <small className="text-muted d-block mt-1">Cargá clientes en la hoja Clientes.</small>
+                  )}
                 </div>
               </div>
             </div>
@@ -287,7 +311,7 @@ export function FacturacionPage() {
                                 />
                               </td>
                               <td className="fact-cell-center">
-                                <input readOnly value={it.price} style={{ width: "4rem" }} />
+                                <input readOnly value={it.price} style={{ width: "3.25rem" }} />
                               </td>
                               <td className="fact-cell-center">
                                 <input
@@ -300,7 +324,7 @@ export function FacturacionPage() {
                                 />
                               </td>
                               <td className="fact-cell-center fact-cell-total">
-                                <input readOnly value={lineTotal.toFixed(2)} style={{ width: "4.5rem" }} />
+                                <input readOnly value={lineTotal.toFixed(2)} style={{ width: "3.5rem" }} />
                               </td>
                               <td className="fact-cell-center">
                                 <button type="button" className="fact-btn-remove" onClick={() => removeItem(idx)} title="Quitar ítem">

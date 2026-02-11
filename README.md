@@ -50,6 +50,26 @@ npm run build
 - `npm run start`: inicia el backend compilado (producción)
 - `npm run legacy:dev`: corre el server anterior (`src/app.js`) por compatibilidad
 
+## Desplegar en Vercel
+
+El proyecto está listo para desplegar solo el **frontend** (client) en Vercel:
+
+1. **Conectar el repo**
+   - Entrá en [vercel.com](https://vercel.com) e iniciá sesión.
+   - ?Add New?? ? ?Project? e importá el repositorio de GitHub/GitLab/Bitbucket.
+
+2. **Configuración del proyecto**
+   - **Root Directory:** dejalo en `.` (raíz del repo).
+   - **Build Command:** `npm run build -w client` (ya viene en `vercel.json`).
+   - **Output Directory:** `client/dist` (ya viene en `vercel.json`).
+   - **Install Command:** `npm install` (por defecto).
+
+3. **Deploy**
+   - Hacé clic en ?Deploy?. Vercel va a instalar dependencias, construir el client y publicar el sitio.
+
+4. **Nota**
+   - Se despliega solo la app React (client). Si en producción la app usa una API, tenés que tener el backend desplegado en otro servicio (Railway, Render, etc.) y configurar la URL de la API en el client (variables de entorno si usás `Vite` env).
+
 ## Notas
 
 - El front ya incluye pantallas en React para **Home / Facturación / Historial / Clientes / Reportes**.

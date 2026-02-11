@@ -1,8 +1,13 @@
 export type ComprobanteType = "Factura" | "Recibo";
 
 export type Client = {
+  id?: number;
   code: string;
   name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  city?: string;
 };
 
 export type LineItem = {
